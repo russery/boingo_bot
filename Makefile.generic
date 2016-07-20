@@ -1,0 +1,91 @@
+#####
+# Includes generic make stuff global across all projects
+# author: R. Ussery
+#####
+
+# os and debug stuff:
+#echo suspend
+ifeq ("$(VERBOSE)","1")
+	NO_ECHO =
+else
+	NO_ECHO = @
+endif
+
+MK = mkdir
+RM = rm -rf
+
+# gcc install
+GCC_INSTALL_ROOT = /usr/local/gcc-arm-none-eabi-5_4-2016q2
+GCC_PREFIX = arm-none-eabi
+CC = $(GCC_INSTALL_ROOT)/bin/$(GCC_PREFIX)-g++
+GDB = $(GCC_INSTALL_ROOT)/bin/$(GCC_PREFIX)-gdb
+OBJDUMP = $(GCC_INSTALL_ROOT)/bin/$(GCC_PREFIX)-objdump
+OBJCOPY = $(GCC_INSTALL_ROOT)/bin/$(GCC_PREFIX)-objcopy
+SIZE = $(GCC_INSTALL_ROOT)/bin/$(GCC_PREFIX)-size
+
+# gdb install
+GDB_PORT_NUMBER = 9992
+
+# paths to source files and objects
+OBJECTS = $(addprefix $(OBJECT_DIRECTORY)/, $(addsuffix .o, $(basename $(notdir $(SOURCE_FILES)))))
+SOURCE_PATHS = $(dir $(SOURCE_FILES))
+vpath %.c $(SOURCE_PATHS)
+vpath %.cc $(SOURCE_PATHS)
+vpath %.cpp $(SOURCE_PATHS)
+
+
+##### Targets:
+default: \
+	clean build size
+
+# create build directories
+$(BUILD_DIRECTORIES):
+	$(NO_ECHO)$(MK) $@
+
+all:\
+	build size
+
+build:\
+	$(BUILD_DIRECTORIES)\
+	$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).elf \
+	$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).hex \
+	$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).bin \
+	$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).lst
+
+$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).elf: $(OBJECTS)
+	@echo ">> Linking files"
+	$(NO_ECHO)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ -T$(LINKER_SCRIPT) $(STARTUP) $^
+
+$(OBJECT_DIRECTORY)/%.o: %.c 
+	@echo ">> Compiling $(notdir $^)"
+	$(NO_ECHO)$(CC) $(CFLAGS) -c $^ -o $@
+
+$(OBJECT_DIRECTORY)/%.o: %.cc
+	@echo ">> Compiling $(notdir $^)"
+	$(NO_ECHO)$(CC) $(CFLAGS) -c $^ -o $@
+
+$(OBJECT_DIRECTORY)/%.o: %.cpp
+	@echo ">> Compiling $(notdir $^)"
+	$(NO_ECHO)$(CC) $(CFLAGS) -c $^ -o $@
+
+$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).hex: \
+	$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).elf
+	$(OBJCOPY) -O ihex $< $@
+
+$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).bin: \
+	$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).elf
+	$(OBJCOPY) -O binary $< $@
+
+$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).lst: \
+	$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).elf
+	$(OBJDUMP) -x -S $< > $@
+
+size:\
+	$(OUTPUT_BINARY_DIRECTORY)/$(PROJECT).elf
+	$(SIZE) $<
+
+clean:
+	@echo Removing $(BUILD_DIRECTORIES)
+	$(NO_ECHO)$(RM) -rf $(BUILD_DIRECTORIES)
+
+.PHONY: all build size clean
